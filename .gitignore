@@ -34,6 +34,9 @@ Thumbs.db
 
 # Data
 data/*.csv
+data/raw/
+data/processed/
+
 
 # Outputs
 results/
