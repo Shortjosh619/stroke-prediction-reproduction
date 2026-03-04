@@ -134,8 +134,10 @@ def split_data(df):
 
     return X_train, X_test, y_train, y_test
 
-
-def apply_oversampling(X_train, y_train):
+#(04/03/2026) when i trained the models data leakage kept happening and i was confused why. realised i had already oversampled in preprocessing and then saved the oversampled csvs, rather than just the scaled ones
+#even though this came back to bite me, it was good to see what ros is actually doing to the data. now i handle it in the pipeline of model_training.py. one line of code rather than a function
+#also i only return the scaled data in save_preprocessed_data
+#def apply_oversampling(X_train, y_train): 
 
     ros = RandomOverSampler(random_state=RANDOM_STATE)
     X_train_resampled, y_train_resampled = ros.fit_resample(X_train, y_train)
@@ -177,10 +179,8 @@ def main():
     X_train, X_test, y_train, y_test = split_data(df_encoded)
     
     X_train_scaled, X_test_scaled, scaler = scale_features(X_train, X_test)
-    
-    X_train_resampled, y_train_resampled = apply_oversampling(X_train_scaled, y_train)
 
-    save_preprocessed_data(X_train_resampled, X_test_scaled, y_train_resampled, y_test)
+    save_preprocessed_data(X_train_scaled, X_test_scaled, y_train, y_test)
 
     print("Preprocessing complete")
 

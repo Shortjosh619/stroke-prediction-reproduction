@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import pandas as pd 
 import numpy as np 
 
-DATA_PATH = Path(r"C:\stroke-prediction-reproduction\data\healthcare-dataset-stroke-data.csv")
+DATA_PATH = Path(r"C:\stroke-prediction-reproduction\data\raw\healthcare-dataset-stroke-data.csv")
 RESULTS_DIR = Path(r"C:\stroke-prediction-reproduction\results")
 
 def configure_plot_style():
