@@ -58,8 +58,8 @@ The paper reported no calibration assessment. This project computes Expected Cal
 ### Threshold Optimisation
 Default threshold (0.5) is inappropriate for imbalanced clinical data. This project sweeps thresholds from 0.05–0.95 and identifies the clinically optimal threshold for LogReg (≥90% recall):
 
-- At threshold=0.05: recall=1.00, specificity=0.18 — catches all 50 stroke cases, 794 false positives
-- At threshold=0.50: recall=0.84, specificity=0.81 — misses 8 stroke cases, 186 false positives
+- At threshold=0.05: recall=1.00, specificity=0.18  -catches all 50 stroke cases, 794 false positives
+- At threshold=0.50: recall=0.84, specificity=0.81 -misses 8 stroke cases, 186 false positives
 
 The threshold selection encodes a clinical assumption: **a missed stroke is worse than an unnecessary referral**. The optimal threshold should be set by clinicians based on explicit cost-benefit analysis, not defaulted to 0.5.
 
