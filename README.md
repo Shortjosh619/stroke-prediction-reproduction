@@ -1,103 +1,167 @@
-# Stroke Prediction - ML Reproduction
+# Stroke Prediction — ML Reproduction & Methodological Critique
 
-This repository reproduces the modelling approach reported in **Akinwumi et al. (2025)**: "Evaluating machine learning models for stroke prediction based on clinical variables" (*Frontiers in Neurology*).
+Reproduces and critically evaluates **Akinwumi et al. (2025)**: *"Evaluating machine learning models for stroke prediction based on clinical variables"* (*Frontiers in Neurology*).
 
-## Models
+This project replicates the paper's modelling pipeline, identifies a critical methodological flaw in the original evaluation, corrects it, and extends the analysis with calibration metrics and threshold optimisation not reported in the paper.
 
-- Logistic Regression
-- Random Forest
-- Gradient Boosting
-- Support Vector Machine (SVM)
-- K-Nearest Neighbors (KNN)
+---
+
+## Key Finding
+
+The original paper reported ~95% accuracy across all models. This replication identified that **oversampling was applied prior to cross-validation**, causing data leakage. Duplicated minority-class rows appeared in both training and validation folds, inflating accuracy on artificially balanced folds.
+
+After correcting the pipeline (oversampling restricted to training folds only via `imblearn.Pipeline`):
+
+| Model | Paper Accuracy | Corrected Accuracy | Paper ROC-AUC | Reproduced ROC-AUC |
+|---|---:|---:|---:|---:|
+| Logistic Regression | 95.11% | 74.4% | 0.84 | 0.836 |
+| Gradient Boosting | 94.9% | 79.8% | 0.82 | 0.808 |
+| Random Forest | 94.95% | 93.8% | 0.80 | 0.801 |
+| SVM | 95.12% | 76.5% | 0.60 | 0.737 |
+| KNN | 94.18% | 85.9% | 0.61 | 0.633 |
+
+ROC-AUC values replicate closely (within 0.01–0.12), validating the core discrimination findings. Accuracy figures diverge because corrected validation folds reflect the real-world 4.9% stroke prevalence rather than artificially balanced folds.
+
+---
+
+## Methodological Correction
+
+**Paper's approach (leaky):**
+```
+Oversample entire dataset → balanced 50:50
+↓
+5-fold CV splits balanced data
+↓
+Validation folds contain duplicate rows from training folds
+↓
+~95% accuracy on memorised data, not generalisation
+```
+
+**Corrected approach:**
+```
+5-fold CV splits original imbalanced data
+↓
+imblearn Pipeline: oversample training fold only
+↓
+Validation fold = original imbalanced distribution
+↓
+Honest evaluation on unseen, real-world data
+```
+
+---
+
+## Extensions Beyond the Paper
+
+### Calibration Metrics (ECE, Brier Score)
+The paper reported no calibration assessment. This project computes Expected Calibration Error (ECE) and Brier Score for all models. LogReg showed ECE=0.287, indicating predicted probabilities require calibration before clinical use despite strong discrimination (ROC-AUC=0.836).
+
+### Threshold Optimisation
+Default threshold (0.5) is inappropriate for imbalanced clinical data. This project sweeps thresholds from 0.05–0.95 and identifies the clinically optimal threshold for LogReg (≥90% recall):
+
+- At threshold=0.05: recall=1.00, specificity=0.18 — catches all 50 stroke cases, 794 false positives
+- At threshold=0.50: recall=0.84, specificity=0.81 — misses 8 stroke cases, 186 false positives
+
+The threshold selection encodes a clinical assumption: **a missed stroke is worse than an unnecessary referral**. The optimal threshold should be set by clinicians based on explicit cost-benefit analysis, not defaulted to 0.5.
+
+---
+
+## Clinical Interpretation
+
+**Accuracy is misleading for imbalanced stroke prediction.**
+
+Random Forest achieved 93.8% accuracy while detecting literally no stroke cases (recall=0). A naive model predicting "no stroke" for every patient would score 95.1%.
+
+Logistic Regression, despite the lowest accuracy (74.4%), achieved the highest recall (84%), catching 42 of 50 stroke cases with only 8 missed. In a screening context, recall is the critical metric.
+
+---
 
 ## Dataset
 
-**Source:** Kaggle Stroke Prediction Dataset
+**Source:** [Kaggle Stroke Prediction Dataset](https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset)
 
-- Rows: 5,110
-- Input features: 11
+- Observations: 5,110
+- Features: 11 (demographic, clinical, behavioural)
 - Target: `stroke` (0 = No, 1 = Yes)
-- Class balance: ~4.9% positive (imbalanced)
+- Class balance: 4.87% positive (19.5:1 imbalance)
 
-Expected feature groups:
+Place CSV at `data/raw/healthcare-dataset-stroke-data.csv` before running.
 
-- Demographic: `age`, `gender`, `ever_married`, `work_type`, `Residence_type`
-- Clinical: `hypertension`, `heart_disease`, `avg_glucose_level`, `bmi`
-- Behavioural: `smoking_status`
+---
 
-Place the CSV at:
+## Repository Structure
 
-- `data\`
-
-## Pipeline
-
-- Missing data: mean imputation for `bmi`
-- Encoding: binary label encoding + one-hot for categoricals
-- Scaling: min-max to [0, 1]
-- Imbalance handling: random over-sampling applied to training folds only
-- Split: 80/20 train-test with stratification
-- Cross-validation: 5-fold stratified
-- Metrics: Accuracy, Precision, Recall, F1, ROC-AUC
-
-## Results comparison
-
-| Model | Paper Accuracy | Reproduced Accuracy | Paper ROC-AUC | Reproduced ROC-AUC |
-|---|---:|---:|---:|---:|
-| Logistic Regression | 95.11% | TBD | 0.836 | TBD |
-| Gradient Boosting | 95.11% | TBD | 0.824 | TBD |
-| Random Forest | ~95% | TBD | 0.792 | TBD |
-| SVM | ~95% | TBD | 0.615 | TBD |
-| KNN | ~95% | TBD | 0.614 | TBD |
-
-Top 3 predictors reported in the paper:
-
-1. Age
-2. Average glucose level
-3. BMI
-
-## Repository structure
-
+```
 stroke-prediction-reproduction/
-  README.md
-  requirements.txt
-  .gitignore
-  data/
-    stroke_data.csv
-  src/
-    preprocessing.py
-    models.py
-    evaluation.py
-  results/
-    model_comparison.csv
-    confusion_matrices/
-    roc_curves.png
-    feature_importance.png
+├── data/
+│   ├── /raw/
+    │   ├──healthcare-dataset-stroke-data.csv          # raw data 
+│   └── processed/               # generated by preprocessing.py
+├── scripts/
+│   ├── eda.py
+│   ├── preprocessing.py
+│   ├── model_training.py
+│   └── threshold_analysis.py
+├── results/
+│   ├── cross_validation/
+│   │   └── cv_results.csv
+│   ├── test_evaluation/
+│   │   └── test_results.csv
+│   ├── confusion_matrices/
+│   └── threshold_analysis/
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
+
+---
 
 ## Setup (Windows CMD)
 
-cmd
+```cmd
 git clone <repo-url>
 cd stroke-prediction-reproduction
 
-py -m venv .venv
-.venv\Scripts\activate
+py -m venv venv
+venv\Scripts\activate
 
-py -m pip install --upgrade pip
 pip install -r requirements.txt
+```
 
+Run scripts in order:
+
+```cmd
+py scripts/eda.py
+py scripts/preprocessing.py
+py scripts/model_training.py
+py scripts/threshold_analysis.py
+```
+
+---
+
+## Limitations
+
+- All models used sklearn default hyperparameters. Tuning via grid search would likely improve performance, particularly for GBoost and SVM
+- No feature selection was applied. Top predictors (age, glucose, BMI) identified by paper were not isolated
+- ECE estimates are noisy given only ~50 stroke cases in the test set at 4.87% prevalence
+- Threshold optimisation at 0.05 achieves 100% recall but flags 81.6% of healthy patients. Operationally impractical without further calibration
+- Single dataset, single random state. External validation on an independent cohort required before any clinical use
+
+---
 
 ## References
 
-Akinwumi, P. O., Ojo, S., Nathaniel, T. I., Wanliss, J., Karunwi, O., & Sulaiman, M. (2025).
-Evaluating machine learning models for stroke prediction based on clinical variables.
-*Frontiers in Neurology, 16*. https://doi.org/10.3389/fneur.2025.1668420
+Akinwumi, P. O., Ojo, S., Nathaniel, T. I., Wanliss, J., Karunwi, O., & Sulaiman, M. (2025). Evaluating machine learning models for stroke prediction based on clinical variables. *Frontiers in Neurology, 16*. https://doi.org/10.3389/fneur.2025.1668420
+
+---
 
 ## Author
 
-Joshua Ajemiri
+**Joshua Ajemiri**
+BSc Psychology with Cognitive Neuroscience, University of Leicester
 
-- BSc Psychology with Cognitive Neuroscience, University of Leicester
 - LinkedIn: https://www.linkedin.com/in/joshuaajemiri-7794682a4/
 - GitHub: https://github.com/Shortjosh619
 
-License: MIT
+---
+
+*License: MIT*
